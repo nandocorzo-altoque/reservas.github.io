@@ -332,7 +332,15 @@ const firebaseConfig={apiKey:"AIzaSyC6maHrxgHMijifYpbPvdnJhnVAiATxAvA",authDomai
 const app=initializeApp(firebaseConfig);
 const db=getFirestore(app);
 
-const HORAS=['13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00','23:00'];
+// HORAS se genera dinámicamente según config
+var HORAS=['13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00','23:00'];
+function generarHoras(){
+  var abre=D.webConfig&&D.webConfig.horaAbre?parseInt(D.webConfig.horaAbre.split(':')[0]):13;
+  var cierra=D.webConfig&&D.webConfig.horaCierra?parseInt(D.webConfig.horaCierra.split(':')[0]):23;
+  var arr=[];
+  for(var h=abre;h<=cierra;h++) arr.push(String(h).padStart(2,'0')+':00');
+  HORAS=arr;
+}
 const DIAS=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 
 var D={fijos:{1:{},2:{}},eventuales:{1:{},2:{}},ausentes:{1:{},2:{}},reservasPendientes:{},config:{precioTurno:0,nombreComplejo:'Canchas Al Toque'},webConfig:{}};
@@ -377,6 +385,7 @@ async function cargarDatos(){
 
 function aplicarConfig(){
   var w=D.webConfig||{};
+  generarHoras();
   var nombre=w.nombre||D.config.nombreComplejo||'Canchas Al Toque';
   document.title=nombre+' — Reservá tu cancha';
   document.getElementById('headerLogo').innerHTML=nombre+'<span>.</span>';
@@ -466,10 +475,20 @@ function estaLibre(cancha,fecha,ds,hora){
   var key=fecha+'_'+hora+'_'+cancha;
   var tienePendiente=!!(D.reservasPendientes[key]);
 
-  if(tienePendiente) return false;
+  if(tienePendiente){
+    // Solo bloquear si esta pendiente o confirmada, no rechazada
+    var r=D.reservasPendientes[key];
+    if(r && r.estado!=='rechazada') return false;
+  }
   if(nFijo){
-    // Fijo ausente sin reemplazo = libre
-    if(ausData&&typeof ausData==='object'&&!ausData.reemplazo) return true;
+    if(ausData){
+      // Ausente sin reemplazo = libre
+      var reem=typeof ausData==='object'?ausData.reemplazo:'';
+      if(!reem) return true;
+      // Con reemplazo = ocupado
+      return false;
+    }
+    // Fijo sin ausencia = ocupado
     return false;
   }
   if(nEv) return false;
@@ -482,6 +501,18 @@ function pintarDispo(){
   var pp=fecha.split('-');
   document.getElementById('diaLabel').textContent=DIAS[ds]+' '+pp[2]+'/'+pp[1]+'/'+pp[0];
   var ldEl=document.getElementById('loadingDispo'); if(ldEl) ldEl.style.display='none';
+
+  // Verificar si el complejo abre este dia
+  var dKeyMap={0:'dom',1:'lun',2:'mar',3:'mie',4:'jue',5:'vie',6:'sab'};
+  var diasCfg=D.webConfig&&D.webConfig.dias;
+  if(diasCfg){
+    var dKey=dKeyMap[ds];
+    if(dKey&&diasCfg[dKey]===false){
+      document.getElementById('grillaDispo').innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--gris-texto)"><div style="font-size:32px;margin-bottom:8px">🔒</div><div>El complejo no abre este día</div></div>';
+      document.getElementById('statLibres').textContent='0';
+      return;
+    }
+  }
 
   var libresTotal=0;
   var html='';
