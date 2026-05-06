@@ -341,7 +341,7 @@ function generarHoras(){
   for(var h=abre;h<=cierra;h++) arr.push(String(h).padStart(2,'0')+':00');
   HORAS=arr;
 }
-const DIAS=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+const DIAS=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']; // 0=Lun igual que el sistema
 
 var D={fijos:{1:{},2:{}},eventuales:{1:{},2:{}},ausentes:{1:{},2:{}},reservasPendientes:{},config:{precioTurno:0,nombreComplejo:'Canchas Al Toque'},webConfig:{}};
 var _reservaActual={cancha:null,fecha:null,hora:null};
@@ -350,7 +350,7 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 function toast(msg,tipo){var el=document.getElementById('toast');el.textContent=msg;el.className='show '+(tipo||'ok');clearTimeout(el._t);el._t=setTimeout(function(){el.className='';},3000);}
 function fmt(n){return '$'+(Number(n)||0).toLocaleString('es-AR');}
 function fmtF(s){if(!s)return'';var p=s.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
-function dSem(f){var d=new Date(f+'T12:00:00');return d.getDay();}
+function dSem(f){var d=new Date(f+'T12:00:00');return (d.getDay()+6)%7;} // 0=Lun,1=Mar...6=Dom igual que el sistema
 function fechaHoy(){var d=new Date();var local=new Date(d.getTime()-d.getTimezoneOffset()*60000);return local.toISOString().split('T')[0];}
 
 async function cargarDatos(){
@@ -503,7 +503,7 @@ function pintarDispo(){
   var ldEl=document.getElementById('loadingDispo'); if(ldEl) ldEl.style.display='none';
 
   // Verificar si el complejo abre este dia
-  var dKeyMap={0:'dom',1:'lun',2:'mar',3:'mie',4:'jue',5:'vie',6:'sab'};
+  var dKeyMap={0:'lun',1:'mar',2:'mie',3:'jue',4:'vie',5:'sab',6:'dom'}; // 0=Lun igual que el sistema
   var diasCfg=D.webConfig&&D.webConfig.dias;
   if(diasCfg){
     var dKey=dKeyMap[ds];
