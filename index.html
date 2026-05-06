@@ -170,6 +170,11 @@ footer{background:var(--gris-fondo);border-top:1px solid var(--gris-borde);paddi
   </div>
 </header>
 
+<!-- AVISO BANNER -->
+<div id="avisoBanner" style="display:none;background:rgba(255,214,0,0.1);border-bottom:1px solid rgba(255,214,0,0.3);padding:10px 5vw;text-align:center">
+  <span style="font-size:13px;color:var(--amarillo)">⚠️ </span><span class="aviso-txt" style="font-size:13px;color:var(--amarillo)"></span>
+</div>
+
 <!-- HERO -->
 <section class="hero">
   <div class="hero-glow"></div>
@@ -215,7 +220,7 @@ footer{background:var(--gris-fondo);border-top:1px solid var(--gris-borde);paddi
         <div class="section-label">El complejo</div>
         <div class="section-title" id="infoNombre">Canchas Al Toque</div>
         <p class="section-sub" id="infoDesc">Canchas de fútbol 5 con césped sintético de última generación. Iluminación LED, vestuarios y estacionamiento.</p>
-        <div class="info-features">
+        <div class="info-features" id="featuresContainer">
           <div class="feature"><div class="feature-icon">🌿</div><div><div class="feature-title">Césped sintético</div><div class="feature-desc">De última generación</div></div></div>
           <div class="feature"><div class="feature-icon">💡</div><div><div class="feature-title">Iluminación LED</div><div class="feature-desc">Partidos nocturnos</div></div></div>
           <div class="feature"><div class="feature-icon">🚿</div><div><div class="feature-title">Vestuarios</div><div class="feature-desc">Con duchas y lockers</div></div></div>
@@ -235,6 +240,7 @@ footer{background:var(--gris-fondo);border-top:1px solid var(--gris-borde);paddi
   <div class="section-inner">
     <div class="section-label">Precios</div>
     <div class="section-title">Tarifas claras,<br>sin sorpresas</div>
+    <div id="promoTexto" style="font-size:13px;color:var(--verde);font-family:DM Mono,monospace;margin-top:8px;margin-bottom:28px"></div>
     <div class="precios-grid">
       <div class="precio-card">
         <div class="precio-tipo">Turno eventual</div>
@@ -277,11 +283,15 @@ footer{background:var(--gris-fondo);border-top:1px solid var(--gris-borde);paddi
       </div>
       <div class="contacto-item">
         <div class="contacto-icon">🕐</div>
-        <div><div class="contacto-lbl">Horario</div><div class="contacto-val">Lunes a Domingo 13:00 – 23:00</div></div>
+        <div><div class="contacto-lbl">Horario</div><div class="contacto-val" id="horarioTexto">Lunes a Domingo 13:00 – 23:00</div></div>
       </div>
       <div class="contacto-item">
         <div class="contacto-icon">⚽</div>
         <div><div class="contacto-lbl">Canchas disponibles</div><div class="contacto-val">2 canchas de fútbol 5</div></div>
+      </div>
+          <div class="contacto-item" id="igItem" style="display:none">
+        <div class="contacto-icon">📸</div>
+        <div><div class="contacto-lbl">Instagram</div><div class="contacto-val"><a href="#" id="igLink" style="color:var(--verde);text-decoration:none"></a></div></div>
       </div>
     </div>
   </div>
@@ -325,7 +335,7 @@ const db=getFirestore(app);
 const HORAS=['13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00','23:00'];
 const DIAS=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 
-var D={fijos:{1:{},2:{}},eventuales:{1:{},2:{}},ausentes:{1:{},2:{}},reservasPendientes:{},config:{precioTurno:0,nombreComplejo:'Canchas Al Toque'}};
+var D={fijos:{1:{},2:{}},eventuales:{1:{},2:{}},ausentes:{1:{},2:{}},reservasPendientes:{},config:{precioTurno:0,nombreComplejo:'Canchas Al Toque'},webConfig:{}};
 var _reservaActual={cancha:null,fecha:null,hora:null};
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;');}
@@ -344,6 +354,8 @@ async function cargarDatos(){
       var evSnap=await getDoc(doc(db,'eventuales','cancha'+c)); if(evSnap.exists()) D.eventuales[c]=evSnap.data().data||{};
       var ausSnap=await getDoc(doc(db,'ausentes','cancha'+c)); if(ausSnap.exists()) D.ausentes[c]=ausSnap.data().data||{};
     }
+    var webCfgSnap=await getDoc(doc(db,'config','web'));
+    if(webCfgSnap.exists()) D.webConfig=webCfgSnap.data()||{};
     // Load pending reservations
     var resSnap=await getDoc(doc(db,'reservasPendientes','data'));
     if(resSnap.exists()) D.reservasPendientes=resSnap.data()||{};
@@ -353,20 +365,84 @@ async function cargarDatos(){
     calcularStats();
   }catch(e){
     console.error('Error cargando datos:',e);
-    document.getElementById('loadingDispo').textContent='Error al cargar. Intentá recargar la página.';
+    var msg='Error: '+e.message;
+    // Common Firebase errors
+    if(e.code==='permission-denied') msg='Sin permisos de Firebase. Verificá las reglas de Firestore.';
+    if(e.code==='unavailable') msg='Firebase no disponible. Verificá tu conexión.';
+    if(e.message&&e.message.includes('offline')) msg='Sin conexión a internet.';
+    var el=document.getElementById('loadingDispo');
+    if(el) el.innerHTML='<div style="color:var(--rojo);padding:20px;font-family:monospace;font-size:12px">⚠ '+msg+'<br><br><button onclick="cargarDatos()" style="background:var(--verde);color:var(--negro);border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-top:8px">Reintentar</button></div>';
   }
 }
 
 function aplicarConfig(){
-  var nombre=D.config.nombreComplejo||'Canchas Al Toque';
+  var w=D.webConfig||{};
+  var nombre=w.nombre||D.config.nombreComplejo||'Canchas Al Toque';
   document.title=nombre+' — Reservá tu cancha';
   document.getElementById('headerLogo').innerHTML=nombre+'<span>.</span>';
   document.getElementById('footerLogo').innerHTML=nombre+'<span>.</span>';
   document.getElementById('infoNombre').textContent=nombre;
-  var precio=D.config.precioTurno||0;
-  document.getElementById('statPrecio').textContent=precio?fmt(precio):'—';
-  document.getElementById('precioTurnoCard').textContent=precio?fmt(precio):'Consultar';
-  document.getElementById('precioFijoCard').textContent=precio?fmt(Math.round(precio*0.9))+'*':'Consultar';
+
+  // Descripcion
+  if(w.descripcion) document.getElementById('infoDesc').textContent=w.descripcion;
+
+  // Direccion y contacto
+  if(w.direccion) document.getElementById('ubicacion').textContent=w.direccion;
+  if(w.telefono){
+    var tel=w.telefono.replace(/[^0-9]/g,'');
+    document.getElementById('waLink').href='https://wa.me/549'+tel;
+    document.getElementById('waLink').textContent='+549 '+w.telefono;
+  }
+
+  // Horarios
+  if(w.horaAbre||w.horaCierra){
+    var horarioEl=document.querySelector('.contacto-val:nth-of-type(3)');
+    var hora=((w.horaAbre||'13:00').slice(0,5))+' – '+((w.horaCierra||'23:00').slice(0,5))+'hs';
+    var diasActivos=[];
+    var diasMap={lun:'Lunes',mar:'Martes',mie:'Miércoles',jue:'Jueves',vie:'Viernes',sab:'Sábado',dom:'Domingo'};
+    if(w.dias) Object.entries(diasMap).forEach(function(e){ if(w.dias[e[0]]) diasActivos.push(e[1]); });
+    var diasStr=diasActivos.length===7?'Todos los días':diasActivos.join(', ');
+    document.getElementById('horarioTexto').textContent=diasStr+' '+hora;
+  }
+
+  // Precios
+  var precioTurno=w.precioTurno||D.config.precioTurno||0;
+  var precioFijo=w.precioFijo||0;
+  document.getElementById('statPrecio').textContent=precioTurno?fmt(precioTurno):'—';
+  document.getElementById('precioTurnoCard').textContent=precioTurno?fmt(precioTurno):'Consultar';
+  document.getElementById('precioFijoCard').textContent=precioFijo?fmt(precioFijo):precioTurno?fmt(Math.round(precioTurno*0.9))+'*':'Consultar';
+
+  // Promo
+  if(w.promo) document.getElementById('promoTexto').textContent=w.promo;
+
+  // Features
+  if(w.features){
+    var featMap={cesped:'featCesped',led:'featLed',vestuarios:'featVestuarios',buffet:'featBuffet',estacionamiento:'featEstacionamiento',techo:'featTecho',wifi:'featWifi',mp:'featMP'};
+    var featLabels={cesped:'🌿 Césped sintético',led:'💡 Iluminación LED',vestuarios:'🚿 Vestuarios con duchas',buffet:'🛒 Buffet y kiosco',estacionamiento:'🅿️ Estacionamiento',techo:'🏠 Techada',wifi:'📶 Wi-Fi',mp:'📱 Mercado Pago'};
+    var featContainer=document.getElementById('featuresContainer');
+    if(featContainer){
+      var html='';
+      Object.entries(w.features).forEach(function(e){
+        if(e[1]&&featLabels[e[0]]){
+          html+='<div class="feature"><div class="feature-icon">'+featLabels[e[0]].split(' ')[0]+'</div>'
+            +'<div><div class="feature-title">'+featLabels[e[0]].slice(3)+'</div></div></div>';
+        }
+      });
+      if(html) featContainer.innerHTML=html;
+    }
+  }
+
+  // Aviso destacado
+  if(w.aviso){
+    var avisoBanner=document.getElementById('avisoBanner');
+    if(avisoBanner){ avisoBanner.style.display='block'; avisoBanner.querySelector('.aviso-txt').textContent=w.aviso; }
+  }
+
+  // Instagram
+  if(w.instagram){
+    var igEl=document.getElementById('igLink');
+    if(igEl){ igEl.href='https://instagram.com/'+w.instagram.replace('@',''); igEl.textContent=w.instagram; igEl.parentElement.parentElement.style.display='flex'; }
+  }
 }
 
 function calcularStats(){
@@ -405,7 +481,7 @@ function pintarDispo(){
   var ds=dSem(fecha);
   var pp=fecha.split('-');
   document.getElementById('diaLabel').textContent=DIAS[ds]+' '+pp[2]+'/'+pp[1]+'/'+pp[0];
-  document.getElementById('loadingDispo').style.display='none';
+  var ldEl=document.getElementById('loadingDispo'); if(ldEl) ldEl.style.display='none';
 
   var libresTotal=0;
   var html='';
@@ -504,7 +580,7 @@ function mostrarConfirmacionPendiente(nombre,reserva){
     +'<div style="font-size:13px;color:var(--gris-texto);line-height:1.5">El complejo va a revisar la disponibilidad y te va a contactar por WhatsApp para confirmar tu turno.</div>'
     +'</div>'
     +'<div style="font-size:12px;color:var(--gris-texto);margin-bottom:20px">El horario queda reservado provisionalmente mientras esperás la confirmación.</div>'
-    +'<button onclick="document.getElementById('confirmacionOverlay').remove()" style="background:var(--verde);color:var(--negro);border:none;padding:12px 32px;border-radius:10px;font-family:DM Sans,sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s;width:100%">Entendido</button>'
+    +'<button data-action="cerrar-confirmacion" style="background:var(--verde);color:var(--negro);border:none;padding:12px 32px;border-radius:10px;font-family:DM Sans,sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s;width:100%">Entendido</button>'
     +'</div>';
 
   document.body.appendChild(overlay);
@@ -514,12 +590,16 @@ function mostrarConfirmacionPendiente(nombre,reserva){
 
 document.addEventListener('click',function(e){
   if(e.target.classList.contains('overlay')) cerrarReserva();
+  if(e.target.dataset&&e.target.dataset.action==='cerrar-confirmacion'){
+    var el=document.getElementById('confirmacionOverlay');
+    if(el) el.remove();
+  }
 });
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape') cerrarReserva();
 });
 
-cargarDatos();
+window.cargarDatos=cargarDatos; cargarDatos();
 </script>
 </body>
 </html>
