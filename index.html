@@ -353,7 +353,13 @@ async function cargarDatos(){
     calcularStats();
   }catch(e){
     console.error('Error cargando datos:',e);
-    document.getElementById('loadingDispo').textContent='Error al cargar. Intentá recargar la página.';
+    var msg='Error: '+e.message;
+    // Common Firebase errors
+    if(e.code==='permission-denied') msg='Sin permisos de Firebase. Verificá las reglas de Firestore.';
+    if(e.code==='unavailable') msg='Firebase no disponible. Verificá tu conexión.';
+    if(e.message&&e.message.includes('offline')) msg='Sin conexión a internet.';
+    var el=document.getElementById('loadingDispo');
+    if(el) el.innerHTML='<div style="color:var(--rojo);padding:20px;font-family:monospace;font-size:12px">⚠ '+msg+'<br><br><button onclick="cargarDatos()" style="background:var(--verde);color:var(--negro);border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-top:8px">Reintentar</button></div>';
   }
 }
 
@@ -405,7 +411,7 @@ function pintarDispo(){
   var ds=dSem(fecha);
   var pp=fecha.split('-');
   document.getElementById('diaLabel').textContent=DIAS[ds]+' '+pp[2]+'/'+pp[1]+'/'+pp[0];
-  document.getElementById('loadingDispo').style.display='none';
+  var ldEl=document.getElementById('loadingDispo'); if(ldEl) ldEl.style.display='none';
 
   var libresTotal=0;
   var html='';
@@ -504,7 +510,7 @@ function mostrarConfirmacionPendiente(nombre,reserva){
     +'<div style="font-size:13px;color:var(--gris-texto);line-height:1.5">El complejo va a revisar la disponibilidad y te va a contactar por WhatsApp para confirmar tu turno.</div>'
     +'</div>'
     +'<div style="font-size:12px;color:var(--gris-texto);margin-bottom:20px">El horario queda reservado provisionalmente mientras esperás la confirmación.</div>'
-    +'<button onclick="document.getElementById('confirmacionOverlay').remove()" style="background:var(--verde);color:var(--negro);border:none;padding:12px 32px;border-radius:10px;font-family:DM Sans,sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s;width:100%">Entendido</button>'
+    +'<button data-action="cerrar-confirmacion" style="background:var(--verde);color:var(--negro);border:none;padding:12px 32px;border-radius:10px;font-family:DM Sans,sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s;width:100%">Entendido</button>'
     +'</div>';
 
   document.body.appendChild(overlay);
@@ -514,12 +520,16 @@ function mostrarConfirmacionPendiente(nombre,reserva){
 
 document.addEventListener('click',function(e){
   if(e.target.classList.contains('overlay')) cerrarReserva();
+  if(e.target.dataset&&e.target.dataset.action==='cerrar-confirmacion'){
+    var el=document.getElementById('confirmacionOverlay');
+    if(el) el.remove();
+  }
 });
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape') cerrarReserva();
 });
 
-cargarDatos();
+window.cargarDatos=cargarDatos; cargarDatos();
 </script>
 </body>
 </html>
